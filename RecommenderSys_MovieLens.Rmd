@@ -1,0 +1,149 @@
+---
+title: "RecommenderSys_MovieLens"
+author: "Chris Wheatley"
+date: "30/08/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Executive Summary:**
+
+
+**Initial Setup:**
+
+Fortunately, the HarvardX-Data Science capstone course has provided the necessary code to initialize both the training and validation data sets.
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+
+library(tidyverse)
+
+library(caret)
+
+library(data.table)
+
+dl <- tempfile()
+
+download.file("https://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                 col.names = c("userId", "movieId", "rating", "timestamp"))
+
+movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+colnames(movies) <- c("movieId", "title", "genres")
+
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
+                                           title = as.character(title),
+                                           genres = as.character(genres))
+
+movielens <- left_join(ratings, movies, by = "movieId")
+
+set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
+edx <- movielens[-test_index,]
+temp <- movielens[test_index,]
+
+validation <- temp %>% 
+  semi_join(edx, by = "movieId") %>%
+  semi_join(edx, by = "userId")
+
+removed <- anti_join(temp, validation)
+
+edx <- rbind(edx, removed)
+
+rm(dl, ratings, movies, test_index, temp, movielens, removed)
+
+```
+
+**Verification:**
+Let's verify the initialization was a success; analyzing the following data frames:
+
+- edx == "training" data set.
+
+- validation == "test" data set.
+
+*Note. Our validation data set is not to be utilized for adjusting our model, it is reserved for generating our final predictions and assessing accuracy, as measured with the 'Root Mean Square Error' (RMSE) method. 
+
+```{r}
+dim(edx)
+
+str(edx)
+```
+The dimensions of the 'edx'/training set; details a data.table of over 9 million observations [m]; with 6 variables associated with each observation. Let's assess the completeness of this data, looking for missing values in each column/variable. 
+
+```{r}
+for (i in 1:ncol(edx)) {
+  na <- sum(is.na(edx[,..i]))
+  print(na)
+}
+```
+
+Nil missing values in the training set, lets evaluate our 'validation' (test) set the same way.
+
+```{r}
+
+dim(validation)
+
+str(validation)
+
+for(i in 1:ncol(validation)) {
+  na <- sum(is.na(validation[,..i]))
+  print(na)
+}
+```
+The dimensions of the 'validation'/test set; details a data.table of just under 1 million observations [m]; with 6 variables associated with each observation. The data.table has identified Nil missing values.
+
+**Further Analysis:**
+Inspecting our data.tables; the following variables are identified:
+
+- userId : *integer* unique identifier for each individual/user [u] who has submitted a review of movie [i].
+- movieId : *numeric* unique identifier for each movie [i], reviewed by user [u]
+- rating : *numeric* looks to be categorical data - representing ratings of movie [i], by user [u]. i.e. 
+                                            `seq(1,5,.5) == .5, 1, 1.5, 2..., 4.5, 5`
+- timestamp : *integer* time representation of when the review was submitted.
+- title : *character* string detailing the title of movie [i] in each observation.
+- genres : *character* string detailing the category of genre movie [i] falls under. 
+
+**Objective**
+Since the objective of this project is to develop a recommendation system able to predict ratings of movie [i] for user[u].
+Lets examine the relationship between ratings [dependent variable] and; userId, movieId and genres [independent variables]. My reasoning for choosing only these variables; is for brevity and also based off the intuition that in a significant volume of reviews. Each user, movie and genre should detail a generalized bias relative to our prediction. As such, given new observations with the same independent variables a model can be formed to compute and add these bias terms and return a probabilistic estimate of a rating [y_hat].
+
+**Variable Analysis and Visualization**
+UserId
+
+```{r}
+
+```
+
+movieId
+
+```{r}
+
+```
+
+genres
+
+```{r}
+
+```
+
+**Hypothesis and Method**
+
+```{r}
+
+```
+
+**Result**
+
+```{r}
+
+```
+
+**Conclusion**
