@@ -9,7 +9,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-**Executive Summary:**
+**Executive Summary:**  
+
+---
 
 
 **Initial Setup:**
@@ -61,7 +63,8 @@ edx <- rbind(edx, removed)
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 
 ```
-
+---
+  
 **Verification:**
 Let's verify the initialization was a success; analyzing the following data frames:
 
@@ -98,9 +101,11 @@ for(i in 1:ncol(validation)) {
   print(na)
 }
 ```
-The dimensions of the 'validation'/test set; details a data.table of just under 1 million observations [m]; with 6 variables associated with each observation. The data.table has identified Nil missing values.
+The dimensions of the 'validation'/test set; details a data.table of just under 1 million observations [m]; with 6 variables associated with each observation. The data.table has identified Nil missing values.  
 
-**Further Analysis:**
+---
+
+**Analysis:**
 Inspecting our data.tables; the following variables are identified:
 
 - userId : *integer* unique identifier for each individual/user [u] who has submitted a review of movie [i].
@@ -111,24 +116,130 @@ Inspecting our data.tables; the following variables are identified:
 - title : *character* string detailing the title of movie [i] in each observation.
 - genres : *character* string detailing the category of genre movie [i] falls under. 
 
+---
+
 **Objective**
 Since the objective of this project is to develop a recommendation system able to predict ratings of movie [i] for user[u].
-Lets examine the relationship between ratings [dependent variable] and; userId, movieId and genres [independent variables]. My reasoning for choosing only these variables; is for brevity and also based off the intuition that in a significant volume of reviews. Each user, movie and genre should detail a generalized bias relative to our prediction. As such, given new observations with the same independent variables a model can be formed to compute and add these bias terms and return a probabilistic estimate of a rating [y_hat].
+Lets examine the relationship between ratings [dependent variable] and; userId, movieId and genres [independent variables].   My reasoning for choosing only these variables; is for brevity and also based off the intuition that in a significant volume of reviews. Each user, movie and genre should detail a generalized bias relative to our prediction. As such, given new observations with the same independent variables a model can be formed to compute and add these bias terms and return a probabilistic estimate of a rating [y_hat].  
+---
 
-**Variable Analysis and Visualization**
-UserId
+**Variable Analysis and Visualization**  
+
+Variable: rating
+
+Frequency distribution of ratings.\  
+
+```{r}
+hist(edx$rating, 
+     main = "Histogram of Ratings",
+     xlab = "Rating")
+```
+  
+
+The above histogram details the following:
+
+```{r}
+edx %>% group_by(rating) %>% 
+  summarize(count = n()) %>% 
+  arrange(., desc(count)) %>% 
+  mutate(proportion = round(count/sum(count),2))
+
+```
+The most common value for ratings is 4.
 
 ```{r}
 
+modeTrain <- 4  
+
 ```
 
-movieId
+Lets look at the mean rating.
 
 ```{r}
 
+muTrain <- mean(edx$rating)
+
+muTrain
+
+```
+To summarize, what we have found with the 'rating' variable. The mode is 4, mean is 3.512. Ratings between whole numbers are less frequent then their whole number equivalent. This variable can be utilized in a supervised learning model to provide real outcomes to train on. As such, it may be necessary to convert this variable into a factor or category for optimization purposes.  
+
+---
+  
+Variable: userId
+
+Magnitude of unique users.  
+
+```{r}
+
+N_UserTrain <- length(unique(edx$userId))
+
+N_UserTest <- length(unique(validation$userId))
+
+tibble(N_UserTrain = N_UserTrain, 
+                     N_UserTest = N_UserTest, 
+                     Delta = N_UserTrain - N_UserTest)
+
 ```
 
-genres
+The table above depicts the number of unique users in both the training data set [69978] test data set [68534]. Also highlighting the difference [1344] between each. This apparent difference, may cause a problem later in the system design/utilization, if we constrain the algorithm to only users seen within the training set; and our model is required to take on new user data. If this is to be the case; we will replace missing values with the mean bias value for each parameter.I.e.  
+
+`ifelse(user bias missing / == NA, then mean(all$userBias), else leave value)`  
+
+Let's look at the number of reviews for each user.
+
+```{r}
+
+userId_dat <- edx %>% 
+  group_by(userId)
+
+userId_dat %>% 
+  summarize(count = n()) %>% 
+  arrange(., desc(count)) %>% 
+  slice_head(n = 10)
+
+userId_dat %>% 
+  summarize(count = n()) %>% 
+  arrange(., desc(count)) %>%
+  slice_tail(n = 10)
+
+```
+Lets's look at the distribution of reviews submitted by our users.\
+
+```{r}
+
+edx %>% group_by(userId) %>% 
+  summarize(count = n()) %>% 
+  mutate(cuts = cut(count, seq(0,7000,l = 50))) %>% 
+  group_by(cuts) %>% 
+  summarize(n = n()) %>% 
+  ggplot() +
+  geom_col(aes(x = cuts, y = n)) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+  
+The above plot highlights 'outlier' users, at the higher end of total reviews. Regularization may be useful to penalize predictions with users with the largest variance.  
+
+---
+    
+Variable: movieId  
+
+Magnitude of unique movies.
+
+```{r}
+
+N_MoviesTrain <- length(unique(edx$movieId))
+
+N_MoviesTest <- length(unique(validation$movieId))
+
+tibble(N_MoviesTrain = N_MoviesTrain, 
+                     N_MoviesTest = N_MoviesTest, 
+                     Delta = N_MoviesTrain - N_MoviesTest)
+
+```
+
+Variable: genres
 
 ```{r}
 
