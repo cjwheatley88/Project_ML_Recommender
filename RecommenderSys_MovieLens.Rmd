@@ -63,6 +63,7 @@ edx <- rbind(edx, removed)
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 
 ```
+
 ---
   
 **Verification:**
@@ -105,19 +106,6 @@ The dimensions of the 'validation'/test set; details a data.table of just under 
 
 ---
 
-**Analysis:**
-Inspecting our data.tables; the following variables are identified:
-
-- userId : *integer* unique identifier for each individual/user [u] who has submitted a review of movie [i].
-- movieId : *numeric* unique identifier for each movie [i], reviewed by user [u]
-- rating : *numeric* looks to be categorical data - representing ratings of movie [i], by user [u]. i.e. 
-                                            `seq(1,5,.5) == .5, 1, 1.5, 2..., 4.5, 5`
-- timestamp : *integer* time representation of when the review was submitted.
-- title : *character* string detailing the title of movie [i] in each observation.
-- genres : *character* string detailing the category of genre movie [i] falls under. 
-
----
-
 **Objective**
 Since the objective of this project is to develop a recommendation system able to predict ratings of movie [i] for user[u].
 Lets examine the relationship between ratings [dependent variable] and; userId, movieId and genres [independent variables].   My reasoning for choosing only these variables; is for brevity and also based off the intuition that in a significant volume of reviews. Each user, movie and genre should detail a generalized bias relative to our prediction. As such, given new observations with the same independent variables a model can be formed to compute and add these bias terms and return a probabilistic estimate of a rating [y_hat].  
@@ -135,7 +123,6 @@ hist(edx$rating,
      xlab = "Rating")
 ```
   
-
 The above histogram details the following:
 
 ```{r}
@@ -236,6 +223,18 @@ N_MoviesTest <- length(unique(validation$movieId))
 tibble(N_MoviesTrain = N_MoviesTrain, 
                      N_MoviesTest = N_MoviesTest, 
                      Delta = N_MoviesTrain - N_MoviesTest)
+
+```
+
+MovieId frequency within dataset
+
+```{R}
+
+ID <- edx %>%
+  group_by(movieId) %>% 
+  summarize(count = n())
+
+ID %>% plot()
 
 ```
 
