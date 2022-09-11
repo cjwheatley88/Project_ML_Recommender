@@ -3,7 +3,6 @@ title: "Movie Recommender System"
 author: "_Christopher Wheatley_"
 date: "15 September 2022"
 output:
-  html_document: default
   pdf_document:
     df_print: kable
     number_sections: yes
@@ -11,6 +10,7 @@ output:
     fig_caption: yes
     includes:
       in_header: preamble.tex
+  html_document: default
 include-before: '`\newpage{}`{=latex}'
 fontsize: 11pt
 ---
@@ -381,9 +381,9 @@ user_effect <- train %>%
 
 head(user_effect)
 
-#initialize lambda == 3
+#initialize lambda == 2
 
-lambda <- 3
+lambda <- 2
 
 y_hat2 <- cv %>% 
   left_join(genre_effect, by = "genres") %>% 
@@ -393,9 +393,85 @@ y_hat2 <- cv %>%
   summarize(y_hat = mu + b_g + (b_u/(n() + lambda)))
 
 RMSE(y_hat2$y_hat, cv$rating)
+
+#Let's optimize the penalty term 'lambda'
+
+lambdaList <- seq(0, 20, .25)
+
+RMSEs <- sapply(lambdaList, function(l) {
   
+  user_effect_reg <- train %>% 
+    group_by(userId) %>% 
+    summarize(b_u_reg = sum(rating - muTrain)/(n() + l))
+  
+  y_hat <- cv %>% 
+    left_join(genre_effect, by = "genres") %>% 
+    left_join(user_effect_reg, by = "userId") %>% 
+    mutate(mu = muTrain) %>%
+    summarize(y_hat = mu + b_g + b_u_reg) %>% 
+    pull()
+  
+  return(RMSE(y_hat, cv$rating))
+})
+
+userTibble <- tibble(RMSE = RMSEs, Lambda = lambdaList)
+
+plot(userTibble$RMSE, xlab = "Lambda")
+
+which.min(userTibble$RMSE)
+
+min(RMSEs)
+
+```
+Lambda set to `r which.min(userTibble$RMSE)`, produces the highest performing model. With a RMSE score of `r min(RMSEs)`
+
+
+```{r}
+
+results <- results %>% add_row(Model = "MeanPlusGenre_PlusUserRegularized", RMSE = min(RMSEs))
+
+results
+
+```
+
+In finale, let's add a regularized bias term for each movie to our model.  
+
+$$y_{hat} = \mu_{ratings} + bias_{genres} + {\frac{bias_{userId}}{(n + \lambda)} + \frac{bias_{movieId}}{(n + \lambda)}}$$
+
+```{r}
 
 #Mean + Genre + Regularized userId + Regularized movieId
+
+lambdaList <- seq(0, 20, .25)
+
+RMSEs <- sapply(lambdaList, function(l) {
+  
+  user_effect_reg <- train %>% 
+    group_by(userId) %>% 
+    summarize(b_u_reg = sum(rating - muTrain)/(n() + 38))
+  
+  movie_effect_reg <- train %>% 
+    group_by(movieId) %>% 
+    summarize(b_m_reg = sum(rating - muTrain)/(n() + l))
+  
+  y_hat <- cv %>% 
+    left_join(genre_effect, by = "genres") %>% 
+    left_join(user_effect_reg, by = "userId") %>%
+    left_join(movie_effect_reg, by = "movieId") %>% 
+    mutate(mu = muTrain) %>%
+    summarize(y_hat = mu + b_g + b_u_reg + b_m_reg) %>% 
+    pull()
+  
+  return(RMSE(y_hat, cv$rating))
+})
+
+userTibble <- tibble(RMSE = RMSEs, Lambda = lambdaList)
+
+plot(userTibble$RMSE, xlab = "Lambda")
+
+which.min(userTibble$RMSE)
+
+min(RMSEs)
 
 ```
 
