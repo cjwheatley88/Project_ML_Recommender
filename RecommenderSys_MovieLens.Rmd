@@ -1,24 +1,40 @@
 ---
-title: "RecommenderSys_MovieLens"
-author: "Chris Wheatley"
-date: "30/08/2022"
-output: html_document
+title: "Movie Recommender System"
+author: "_Christopher Wheatley_"
+date: "15 September 2022"
+output:
+  html_document: default
+  pdf_document:
+    df_print: kable
+    number_sections: yes
+    toc: yes
+    fig_caption: yes
+    includes:
+      in_header: preamble.tex
+include-before: '`\newpage{}`{=latex}'
+fontsize: 11pt
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, 
+                      warning = FALSE, 
+                      message = FALSE, 
+                      fig.align = "center", 
+                      out.width = "75%")
 ```
 
-**Executive Summary:**  
+\newpage
+
+# **Executive Summary:**  
+Blah blah
 
 ---
 
-
 **Initial Setup:**
 
-Fortunately, the HarvardX-Data Science capstone course has provided the necessary code to initialize both the training and validation data sets.
+Fortunately, the Harvard X Data Science capstone course has provided the necessary code to initialize both the training and validation data sets.
 
-```{r message=FALSE, error=FALSE, warning=FALSE}
+```{r}
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
@@ -64,9 +80,9 @@ rm(dl, ratings, movies, test_index, temp, movielens, removed)
 
 ```
 
----
+\newpage
   
-**Verification:**
+# **Verification:**
 Let's verify the initialization was a success; analyzing the following data frames:
 
 - edx == "training" data set.
@@ -106,12 +122,13 @@ The dimensions of the 'validation'/test set; details a data.table of just under 
 
 ---
 
-**Objective**
+# **Strategy | Objective**
 Since the objective of this project is to develop a recommendation system able to predict ratings of movie [i] for user[u].
-Lets examine the relationship between ratings [dependent variable] and; userId, movieId and genres [independent variables].   My reasoning for choosing only these variables; is for brevity and also based off the intuition that in a significant volume of reviews. Each user, movie and genre should detail a generalized bias relative to our prediction. As such, given new observations with the same independent variables a model can be formed to compute and add these bias terms and return a probabilistic estimate of a rating [y_hat].  
----
+Lets examine the relationship between ratings [dependent variable] and; userId, movieId and genres [independent variables].   My reasoning for choosing only these variables; is for brevity and also based off the intuition that in a significant volume of reviews. Each user, movie and genre should detail a generalized bias relative to our prediction. As such, given new observations with the same independent variables a model can be formed to compute and add these bias terms and return a probabilistic estimate of a rating [y_hat]. 
+  
+\newpage
 
-**Variable Analysis and Visualization**  
+# **Variable Analysis and Visualization**  
 
 Variable: rating
 
@@ -123,7 +140,7 @@ hist(edx$rating,
      xlab = "Rating")
 ```
   
-The above histogram details the following:
+Numerical representation of the above histogram is as follows:
 
 ```{r}
 edx %>% group_by(rating) %>% 
@@ -177,36 +194,33 @@ Let's look at the number of reviews for each user.
 
 ```{r}
 
-userId_dat <- edx %>% 
-  group_by(userId)
-
-userId_dat %>% 
+edx %>% 
+  group_by(userId) %>% 
   summarize(count = n()) %>% 
   arrange(., desc(count)) %>% 
   slice_head(n = 10)
 
-userId_dat %>% 
+edx %>% 
+  group_by(userId) %>% 
   summarize(count = n()) %>% 
   arrange(., desc(count)) %>%
   slice_tail(n = 10)
 
 ```
-Lets's look at the distribution of reviews submitted by our users.\
+Next we will assess the distribution of user reviews.\
 
 ```{r}
 
-edx %>% group_by(userId) %>% 
-  summarize(count = n()) %>% 
-  mutate(cuts = cut(count, seq(0,7000,l = 50))) %>% 
-  group_by(cuts) %>% 
-  summarize(n = n()) %>% 
-  ggplot() +
-  geom_col(aes(x = cuts, y = n)) +
-  theme(axis.text.x = element_text(angle = 90))
+edx %>% 
+  count(userId) %>% 
+  ggplot(aes(n)) +
+  geom_histogram(bins = 50, color = "black") +
+  ggtitle("Histogram UserId") +
+  scale_x_log10()
 
 ```
   
-The above plot highlights 'outlier' users, at the higher end of total reviews. Regularization may be useful to penalize predictions with users with the largest variance.  
+The above plot highlights certain 'outlier' users, at the higher end of total reviews. Regularization may be useful to penalize predictions with users with the largest variance.  
 
 ---
     
@@ -226,34 +240,175 @@ tibble(N_MoviesTrain = N_MoviesTrain,
 
 ```
 
-MovieId frequency within dataset
+Frequency of 'movieId' within training data-set:
 
 ```{R}
 
-ID <- edx %>%
-  group_by(movieId) %>% 
-  summarize(count = n())
-
-ID %>% plot()
+edx %>% 
+  count(movieId) %>% 
+  ggplot(aes(n)) +
+  geom_histogram(bins = 50, color = "black") +
+  ggtitle("Histogram movieId") +
+  scale_x_log10()
 
 ```
+
+Frequency range of movie reviews:
+
+```{r}
+
+edx %>% 
+  group_by(title) %>% 
+  summarize(count = n()) %>% 
+  arrange(., desc(count)) %>% 
+  slice_head(n = 10)
+
+edx %>% 
+  group_by(title) %>% 
+  summarize(count = n()) %>% 
+  arrange(., desc(count)) %>% 
+  slice_tail(n = 10)
+```
+
+Similar to userId, movieId may need to be penalized based off the number of reviews observed within the training data set. 
+
+---
 
 Variable: genres
 
 ```{r}
 
-```
+edx %>% 
+  summarize(genres = n_distinct(genres))
 
-**Hypothesis and Method**
+edx %>% 
+  group_by(genres) %>% 
+  summarize(count = n()) %>% 
+  arrange(., desc(count)) %>% 
+  top_n(., n = 10)
+
+```
+  
+Analyzing the 'genres' variable depicts 797 unique categories within the 'edx' data-set. People love Drama... 
+
+# **Hypothesis and Method**
+
+For simplicity sake and for brevity. I will choose a Naive Bayes approach to generating the recommender system model. This approach starts with the mean rating of all reviews and adds bias terms in an iterative fashion, assessing with each addition the accuracy of the model. Accuracy will be measured through RMSE calculations between a training set and one cross validation set. Regularization will be applied where necessary.  
 
 ```{r}
 
+#Stratify data into a training data-set and a cross-validation (CV) data-set. [.9 | .1 respectively]
+
+set.seed(1, sample.kind = "Rounding")
+
+index <- createDataPartition(y = edx$rating, times = 1, p = .1, list = FALSE)
+
+train <- edx[-index,]
+
+temp <- edx[index,]
+
+#To avoid our model producing "NA"s; we must ensure parameter data is both in the training and cross-validation data-sets.
+
+cv <- temp %>% 
+  semi_join(train, by = "movieId") %>% 
+  semi_join(train, by = "userId") %>% 
+  semi_join(train, by = "genres")
+
+removed <- anti_join(temp, cv)
+
+train <- rbind(train, removed)
+
+rm(removed, temp, index)
+
+#Initial model utilizing mode only.
+
+modeOnly <- RMSE(cv$rating, modeTrain)
+
+#Initial model utilzing mean only.
+
+meanOnly <- RMSE(cv$rating, muTrain)
+
+results <- tibble(Model = c("Mode","Mean"),
+       RMSE = c(modeOnly, meanOnly))
+
+results
+
+#Mean looks to be a more accurate means of prediction.
+
+#As such, our model will start with the mean estimate plus Bias terms for the variables: genres, movieId and userId. Let's begin with generating least square estimates for each genre.
+
 ```
 
-**Result**
+$$y_{hat} = \mu_{ratings} + bias_{term1} + bias_{term2} + .. n$$
+  
+Let's add a bias term for Genre with our first iteration.    
+
+$$y_{hat} = \mu_{ratings} + bias_{genres}$$
 
 ```{r}
 
+#Mean + Genre
+
+genre_effect <- train %>% 
+  group_by(genres) %>% 
+  summarize(b_g = mean(rating - muTrain))
+
+head(genre_effect)
+
+y_hat1 <- cv %>% 
+  left_join(genre_effect, by = "genres") %>% 
+  mutate(mu = muTrain) %>% 
+  summarize(y_hat = mu + b_g)
+
+muPlusGenre <- RMSE(y_hat1$y_hat,cv$rating)
+
+results <- results %>% add_row(Model = "MeanPlusGenre", RMSE = muPlusGenre)
+
+results
+
 ```
 
-**Conclusion**
+We seem to be tracking in a positive direction, let's add another bias term - userId. As observed through our exploratory data analysis, certain users are seen to be outliers with reference to the majority; specifically in terms of their frequency of reviews. As such we will apply regularization to this term to reduce the overall variability of our bias term and hopefully increase the accuracy of predictions.  
+
+$$y_{hat} = \mu_{ratings} + bias_{genres} + \frac{bias_{userId}}{(n + \lambda)}$$
+```{r}
+
+#Mean + Genre + Regularized userId
+
+user_effect <- train %>% 
+  group_by(userId) %>% 
+  summarize(b_u = mean(rating - muTrain))
+
+head(user_effect)
+
+#initialize lambda == 3
+
+lambda <- 3
+
+y_hat2 <- cv %>% 
+  left_join(genre_effect, by = "genres") %>% 
+  left_join(user_effect, by = "userId") %>% 
+  mutate(mu = muTrain) %>% 
+  group_by(userId) %>% 
+  summarize(y_hat = mu + b_g + (b_u/(n() + lambda)))
+
+RMSE(y_hat2$y_hat, cv$rating)
+  
+
+#Mean + Genre + Regularized userId + Regularized movieId
+
+```
+
+# **Result**
+
+Utilizing a Naive Bayes approach and with the following variables available we have achieved a RMSE accuracy score of XXXXX
+
+```{r}
+
+#Plot results
+
+```
+
+# **Conclusion**
+
+Limitations / Future work.. given enough computing power, i am eager to utilize a matri
