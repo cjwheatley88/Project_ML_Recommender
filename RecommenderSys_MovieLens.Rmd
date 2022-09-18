@@ -1,7 +1,8 @@
 ---
 title: "Movie Recommender System"
 author: "_Christopher Wheatley_"
-date: "15 September 2022"
+date: "17 September 2022"
+geometry: margin = 1cm
 output:
   pdf_document:
     df_print: kable
@@ -24,13 +25,16 @@ knitr::opts_chunk$set(echo = FALSE,
 ```
 
 \newpage
+# **Executive Summary**  
 
-# **Executive Summary:**  
-Blah blah
+This report satisfies the first capstone project of two; within the Data Science program provided by edX and HarvardX. The primary objective being to generate a movie rating recommendation system through data; analysis, visualization, hypothesis generation, optimization and testing. As such; we have proven that given a large enough data set of movie reviews with variables for movie rating, movie genre, user identification, movie identification. One is able to build the following generalized machine learning algorithm which is able to predict a rating for movie i and user u; to a Root Mean Squared Error (RMSE) / accuracy of 0.8704178.
+  
+  $$y_{hat} = \mu_{ratings} + ({\frac{bias_{genres}}{(n() + \lambda)}}) + ({\frac{bias_{userId}}{(n() + \lambda)}) + (\frac{bias_{movieId}}{(n() + \lambda)})}$$
 
----
 
-**Initial Setup:**
+# **Initial Setup | Verification**
+
+*Setup:*  
 
 Fortunately, the Harvard X Data Science capstone course has provided the necessary code to initialize both the training and validation data sets.
 
@@ -79,98 +83,105 @@ edx <- rbind(edx, removed)
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 
 ```
-
-\newpage
   
-# **Verification:**
+*Verification:*  
+
 Let's verify the initialization was a success; analyzing the following data frames:
 
-- edx == "training" data set.
+- 'edx'; which will be our *training* data set.
 
-- validation == "test" data set.
-
-*Note. Our validation data set is not to be utilized for adjusting our model, it is reserved for generating our final predictions and assessing accuracy, as measured with the 'Root Mean Square Error' (RMSE) method. 
+- 'validation'; which will be our *test* data set.\
 
 ```{r}
-dim(edx)
 
-str(edx)
+tibble(rows = nrow(edx), variables = ncol(edx))
+
+data.frame(variable = names(edx),
+           class = sapply(edx, typeof),
+           first_values = sapply(edx, function(x) paste0(head(x, n = 3),  collapse = ", ")),
+           row.names = NULL) %>% 
+  tibble()
+
 ```
-The dimensions of the 'edx'/training set; details a data.table of over 9 million observations [m]; with 6 variables associated with each observation. Let's assess the completeness of this data, looking for missing values in each column/variable. 
+The dimensions of the 'edx'/training set; details a data.table of over 9 million observations [m]; with 6 variables [n] associated with each observation. Let's assess the completeness of this data, looking for missing values in each column/variable. 
+\newpage
 
-```{r}
+*Checking for missing Data:*
+
+I like to utilize a for loop across each variable looking for missing data.
+
+```{r - na check, echo = TRUE}
+
+#example method to assess NAs with for loop.
+
 for (i in 1:ncol(edx)) {
   na <- sum(is.na(edx[,..i]))
   print(na)
 }
 ```
 
-Nil missing values in the training set, lets evaluate our 'validation' (test) set the same way.
-
+All 6 variables have zero missing values in the training set, lets evaluate our 'validation' (test) set the same way.
+  
 ```{r}
 
-dim(validation)
+tibble(rows = nrow(validation), variables = ncol(validation))
 
-str(validation)
+data.frame(variable = names(validation),
+           class = sapply(validation, typeof),
+           first_values = sapply(validation, function(x) paste0(head(x, n = 3),  collapse = ", ")),
+           row.names = NULL) %>% 
+  tibble()
 
 for(i in 1:ncol(validation)) {
   na <- sum(is.na(validation[,..i]))
   print(na)
 }
 ```
-The dimensions of the 'validation'/test set; details a data.table of just under 1 million observations [m]; with 6 variables associated with each observation. The data.table has identified Nil missing values.  
+The dimensions of the 'validation' / test set; details a data.table of just under 1 million observations [m]; with 6 variables [n] associated with each observation. The data.table has identified Nil missing values.  
 
 ---
 
-# **Strategy | Objective**
-Since the objective of this project is to develop a recommendation system able to predict ratings of movie [i] for user[u].
-Lets examine the relationship between ratings [dependent variable] and; userId, movieId and genres [independent variables].   My reasoning for choosing only these variables; is for brevity and also based off the intuition that in a significant volume of reviews. Each user, movie and genre should detail a generalized bias relative to our prediction. As such, given new observations with the same independent variables a model can be formed to compute and add these bias terms and return a probabilistic estimate of a rating [y_hat]. 
+# **Objective | Strategy**
+
+*Objective:* 
+
+Develop and test a movie recommendation model able to predict ratings of movie [i] for user[u]. With accuracy measured through a RMSE < 0.86490. 
+
+*Strategy:*  
+
+First examine the relationship between the following variables: 'ratings' [dependent variable] and; 'userId', 'movieId' and 'genres' [independent variables]. The reasoning for choosing only these variables; is for brevity and based off an intuition that in a significant volume of reviews. Each user movie and genre should detail a generalized bias relative to the mean rating. Thus, given new observations with the same independent variables a model can be formed to compute [add the bias terms to a mean] and return a probabilistic estimate of a rating [y_hat].  
   
-\newpage
+# **Variable Analysis | Visualization**  
 
-# **Variable Analysis and Visualization**  
-
-Variable: rating
+*Variable: rating*
 
 Frequency distribution of ratings.\  
 
-```{r}
+```{r - visualization, fig.cap="Histogram of Ratings"}
 hist(edx$rating, 
      main = "Histogram of Ratings",
      xlab = "Rating")
 ```
-  
+\newpage  
 Numerical representation of the above histogram is as follows:
 
-```{r}
+```{r - tabulated histogram with proportion, fig.cap="Ratings Table"}
 edx %>% group_by(rating) %>% 
   summarize(count = n()) %>% 
   arrange(., desc(count)) %>% 
   mutate(proportion = round(count/sum(count),2))
 
 ```
-The most common value for ratings is 4.
-
-```{r}
-
-modeTrain <- 4  
-
-```
-
-Lets look at the mean rating.
-
-```{r}
-
-muTrain <- mean(edx$rating)
-
-muTrain
-
-```
-To summarize, what we have found with the 'rating' variable. The mode is 4, mean is 3.512. Ratings between whole numbers are less frequent then their whole number equivalent. This variable can be utilized in a supervised learning model to provide real outcomes to train on. As such, it may be necessary to convert this variable into a factor or category for optimization purposes.  
-
----
   
-Variable: userId
+```{r - assign mode variable}
+
+modeTrain <- 4
+
+```
+  
+To summarize what we have found with the 'rating' variable. The mode is 4 and mean is `r mean(edx$rating)`. Ratings between whole numbers are less frequent then their whole number equivalent. This variable can be utilized in a supervised learning model to provide real outcomes for training a hypothesis. As such, it may be necessary to convert this variable into a factor or category for optimization purposes.  
+  
+*Variable: userId*
 
 Magnitude of unique users.  
 
@@ -185,31 +196,14 @@ tibble(N_UserTrain = N_UserTrain,
                      Delta = N_UserTrain - N_UserTest)
 
 ```
+  
+The table above depicts the number of unique users in both the training data set [69978] and the test data set [68534]. Also highlighting the difference [1344] between each. This apparent difference, may cause a problem later in the system design/utilization, if we constrain the algorithm to only users seen within the training set; and our model is required to take on new user data. If this is to be the case; we will replace missing values with the mean bias value for each parameter. I.e.  
 
-The table above depicts the number of unique users in both the training data set [69978] test data set [68534]. Also highlighting the difference [1344] between each. This apparent difference, may cause a problem later in the system design/utilization, if we constrain the algorithm to only users seen within the training set; and our model is required to take on new user data. If this is to be the case; we will replace missing values with the mean bias value for each parameter.I.e.  
+`ifelse(user bias missing, then replace with mean(all$userBias), else leave value)`  
+  
+Now let's plot the frequency distribution of reviews from users.  
 
-`ifelse(user bias missing / == NA, then mean(all$userBias), else leave value)`  
-
-Let's look at the number of reviews for each user.
-
-```{r}
-
-edx %>% 
-  group_by(userId) %>% 
-  summarize(count = n()) %>% 
-  arrange(., desc(count)) %>% 
-  slice_head(n = 10)
-
-edx %>% 
-  group_by(userId) %>% 
-  summarize(count = n()) %>% 
-  arrange(., desc(count)) %>%
-  slice_tail(n = 10)
-
-```
-Next we will assess the distribution of user reviews.\
-
-```{r}
+```{r - freq dist of user reviews, fig.cap="Histogram UserId"}
 
 edx %>% 
   count(userId) %>% 
@@ -220,13 +214,13 @@ edx %>%
 
 ```
   
-The above plot highlights certain 'outlier' users, at the higher end of total reviews. Regularization may be useful to penalize predictions with users with the largest variance.  
+The above right skewed plot highlights 'outlier' users, at the higher and lower end of the number of reviews. Regularization may be useful to penalize predictions from users with the largest variance from the mean.  
 
 ---
     
-Variable: movieId  
+*Variable: movieId*  
 
-Magnitude of unique movies.
+Number of unique movies between data sets and delta.
 
 ```{r}
 
@@ -239,10 +233,10 @@ tibble(N_MoviesTrain = N_MoviesTrain,
                      Delta = N_MoviesTrain - N_MoviesTest)
 
 ```
-
+  
 Frequency of 'movieId' within training data-set:
 
-```{R}
+```{r - movie freq dist, fig.cap="Histogram movieId"}
 
 edx %>% 
   count(movieId) %>% 
@@ -252,31 +246,14 @@ edx %>%
   scale_x_log10()
 
 ```
-
-Frequency range of movie reviews:
-
-```{r}
-
-edx %>% 
-  group_by(title) %>% 
-  summarize(count = n()) %>% 
-  arrange(., desc(count)) %>% 
-  slice_head(n = 10)
-
-edx %>% 
-  group_by(title) %>% 
-  summarize(count = n()) %>% 
-  arrange(., desc(count)) %>% 
-  slice_tail(n = 10)
-```
-
-Similar to userId, movieId may need to be penalized based off the number of reviews observed within the training data set. 
+  
+Similar to userId, movieId contains outliers; which may need to be penalized also.
 
 ---
 
-Variable: genres
+*Variable: genres*
 
-```{r}
+```{r - genres}
 
 edx %>% 
   summarize(genres = n_distinct(genres))
@@ -291,9 +268,9 @@ edx %>%
   
 Analyzing the 'genres' variable depicts 797 unique categories within the 'edx' data-set. People love Drama... 
 
-# **Hypothesis and Method**
+# **Hypothesis | Method**
 
-For simplicity sake and for brevity. I will choose a Naive Bayes approach to generating the recommender system model. This approach starts with the mean rating of all reviews and adds bias terms in an iterative fashion, assessing with each addition the accuracy of the model. Accuracy will be measured through RMSE calculations between a training set and one cross validation set. Regularization will be applied where necessary.  
+A Naive Bayes method will be utilized to form the model hypothesis. This approach starts with the mean rating of all reviews and adds bias terms in an iterative fashion, assessing with each addition the accuracy of the model. As stated in the objective, accuracy will be measured through RMSE calculations between a training set and one cross validation set. Regularization will be applied where necessary.  
 
 ```{r}
 
@@ -307,7 +284,7 @@ train <- edx[-index,]
 
 temp <- edx[index,]
 
-#To avoid our model producing "NA"s; we must ensure parameter data is both in the training and cross-validation data-sets.
+#To avoid our model producing "NA"s; we must ensure the same categorical data is both in the training and cross-validation data-sets.
 
 cv <- temp %>% 
   semi_join(train, by = "movieId") %>% 
@@ -326,7 +303,7 @@ modeOnly <- RMSE(cv$rating, modeTrain)
 
 #Initial model utilzing mean only.
 
-meanOnly <- RMSE(cv$rating, muTrain)
+meanOnly <- RMSE(cv$rating, mean(train$rating))
 
 results <- tibble(Model = c("Mode","Mean"),
        RMSE = c(modeOnly, meanOnly))
@@ -349,18 +326,17 @@ $$y_{hat} = \mu_{ratings} + bias_{genres}$$
 
 #Mean + Genre
 
+muTrain <- mean(train$rating)
+
 genre_effect <- train %>% 
   group_by(genres) %>% 
   summarize(b_g = mean(rating - muTrain))
 
-head(genre_effect)
+pred_1 <- cv %>% 
+  left_join(genre_effect, by = "genres") %>%
+  mutate(y_hat = muTrain + b_g)
 
-y_hat1 <- cv %>% 
-  left_join(genre_effect, by = "genres") %>% 
-  mutate(mu = muTrain) %>% 
-  summarize(y_hat = mu + b_g)
-
-muPlusGenre <- RMSE(y_hat1$y_hat,cv$rating)
+muPlusGenre <- RMSE(pred_1$y_hat,cv$rating)
 
 results <- results %>% add_row(Model = "MeanPlusGenre", RMSE = muPlusGenre)
 
@@ -368,123 +344,160 @@ results
 
 ```
 
-We seem to be tracking in a positive direction, let's add another bias term - userId. As observed through our exploratory data analysis, certain users are seen to be outliers with reference to the majority; specifically in terms of their frequency of reviews. As such we will apply regularization to this term to reduce the overall variability of our bias term and hopefully increase the accuracy of predictions.  
+With the first iteration - our model has increased accuracy. Now let's add another bias term - userId. 
 
-$$y_{hat} = \mu_{ratings} + bias_{genres} + \frac{bias_{userId}}{(n + \lambda)}$$
+$$y_{hat} = \mu_{ratings} + bias_{genres} + {bias_{userId}}$$
 ```{r}
 
-#Mean + Genre + Regularized userId
+#Mean + Genre + userId
 
 user_effect <- train %>% 
+  left_join(genre_effect, by = "genres") %>% 
   group_by(userId) %>% 
-  summarize(b_u = mean(rating - muTrain))
+  summarize(b_u = mean(rating - muTrain - b_g))
 
-head(user_effect)
-
-#initialize lambda == 2
-
-lambda <- 2
-
-y_hat2 <- cv %>% 
+pred_2 <- cv %>% 
   left_join(genre_effect, by = "genres") %>% 
   left_join(user_effect, by = "userId") %>% 
-  mutate(mu = muTrain) %>% 
-  group_by(userId) %>% 
-  summarize(y_hat = mu + b_g + (b_u/(n() + lambda)))
+  mutate(y_hat = muTrain + b_g + b_u)
 
-RMSE(y_hat2$y_hat, cv$rating)
+RMSE(pred_2$y_hat, cv$rating)
 
-#Let's optimize the penalty term 'lambda'
-
-lambdaList <- seq(0, 20, .25)
-
-RMSEs <- sapply(lambdaList, function(l) {
-  
-  user_effect_reg <- train %>% 
-    group_by(userId) %>% 
-    summarize(b_u_reg = sum(rating - muTrain)/(n() + l))
-  
-  y_hat <- cv %>% 
-    left_join(genre_effect, by = "genres") %>% 
-    left_join(user_effect_reg, by = "userId") %>% 
-    mutate(mu = muTrain) %>%
-    summarize(y_hat = mu + b_g + b_u_reg) %>% 
-    pull()
-  
-  return(RMSE(y_hat, cv$rating))
-})
-
-userTibble <- tibble(RMSE = RMSEs, Lambda = lambdaList)
-
-plot(userTibble$RMSE, xlab = "Lambda")
-
-which.min(userTibble$RMSE)
-
-min(RMSEs)
-
-```
-Lambda set to `r which.min(userTibble$RMSE)`, produces the highest performing model. With a RMSE score of `r min(RMSEs)`
-
-
-```{r}
-
-results <- results %>% add_row(Model = "MeanPlusGenre_PlusUserRegularized", RMSE = min(RMSEs))
+results <- results %>% add_row(Model = "MeanPlusGenre_PlusUser", RMSE = RMSE(pred_2$y_hat, cv$rating))
 
 results
 
 ```
 
-In finale, let's add a regularized bias term for each movie to our model.  
+The next bias term is for movies.
 
-$$y_{hat} = \mu_{ratings} + bias_{genres} + {\frac{bias_{userId}}{(n + \lambda)} + \frac{bias_{movieId}}{(n + \lambda)}}$$
+$$y_{hat} = \mu_{ratings} + bias_{genres} + bias_{userId} + bias_{movieId}$$
 
 ```{r}
 
-#Mean + Genre + Regularized userId + Regularized movieId
+#Mean + Genre + userId + movieId
 
-lambdaList <- seq(0, 20, .25)
+movie_effect <- train %>% 
+  left_join(genre_effect, by = "genres") %>% 
+  left_join(user_effect, by = "userId") %>% 
+  group_by(movieId) %>% 
+  summarize(b_i = mean(rating - muTrain - b_g - b_u))
 
-RMSEs <- sapply(lambdaList, function(l) {
+pred_3 <- cv %>% 
+  left_join(genre_effect, by = "genres") %>% 
+  left_join(user_effect, by = "userId") %>% 
+  left_join(movie_effect, by = "movieId") %>% 
+  mutate(y_hat = muTrain + b_g + b_u + b_i)
+
+RMSE(pred_3$y_hat, cv$rating)
+
+results <- results %>% add_row(Model = "MeanPlusGenre_PlusUser_PlusMovie", RMSE = RMSE(pred_3$y_hat, cv$rating))
+
+results
+
+```
+
+As highlighted through the analysis and visualization phase. Certain parameter values have significantly less frequent observations, and since we are trying to generalize an average prediction for each dimension. These outlier values could add unwanted variability with our predictions. As such we will add the penalty term 'Lambda' to our hypothesis, reducing the outlier affect from less frequent values skewing our predictions. 
+
+$$y_{hat} = \mu_{ratings} + ({\frac{bias_{genres}}{(n + \lambda)}}) + ({\frac{bias_{userId}}{(n + \lambda)}) + (\frac{bias_{movieId}}{(n + \lambda)})}$$
   
-  user_effect_reg <- train %>% 
-    group_by(userId) %>% 
-    summarize(b_u_reg = sum(rating - muTrain)/(n() + 38))
+To optimize our hypothesis and select the most accurate value for $\lambda$, we will iterate values from 4 to 10; in increments of .25. Plotting our results and selecting the $\lambda$ value which returns the minimum RMSE.  
   
-  movie_effect_reg <- train %>% 
-    group_by(movieId) %>% 
-    summarize(b_m_reg = sum(rating - muTrain)/(n() + l))
+```{r}
+
+lambdaList <- seq(4, 10, .25)
+
+rmseFinal <- sapply(lambdaList, function(l){
   
-  y_hat <- cv %>% 
-    left_join(genre_effect, by = "genres") %>% 
-    left_join(user_effect_reg, by = "userId") %>%
-    left_join(movie_effect_reg, by = "movieId") %>% 
-    mutate(mu = muTrain) %>%
-    summarize(y_hat = mu + b_g + b_u_reg + b_m_reg) %>% 
-    pull()
+  mu <- mean(train) 
   
-  return(RMSE(y_hat, cv$rating))
+  genre_effect <- train %>% 
+  group_by(genres) %>% 
+  summarize(b_g = sum(rating - muTrain)/(n() + l))
+  
+  user_effect <- train %>% 
+  left_join(genre_effect, by = "genres") %>% 
+  group_by(userId) %>% 
+  summarize(b_u = sum(rating - muTrain - b_g)/(n() + l))
+  
+  movie_effect <- train %>% 
+  left_join(genre_effect, by = "genres") %>% 
+  left_join(user_effect, by = "userId") %>% 
+  group_by(movieId) %>% 
+  summarize(b_i = sum(rating - muTrain - b_g - b_u)/(n() + l))
+  
+  predFinal <- cv %>% 
+  left_join(genre_effect, by = "genres") %>% 
+  left_join(user_effect, by = "userId") %>% 
+  left_join(movie_effect, by = "movieId") %>% 
+  mutate(y_hat = muTrain + b_g + b_u + b_i) %>% 
+  pull(y_hat)
+  
+  return(RMSE(predFinal, cv$rating))
+  
 })
 
-userTibble <- tibble(RMSE = RMSEs, Lambda = lambdaList)
+plot_tibble <- tibble(rmse = rmseFinal, lambda = lambdaList)
 
-plot(userTibble$RMSE, xlab = "Lambda")
+plot_tibble %>% ggplot() +
+  geom_point(aes(x = lambda, y = rmse))
 
-which.min(userTibble$RMSE)
+results <- results %>% add_row(Model = "MeanPlusGenre_PlusUser_PlusMovie_Regularized", RMSE = min(rmseFinal))
 
-min(RMSEs)
+results
 
 ```
+  
+Lambda set to `r lambdaList[which.min(rmseFinal)]`, produces the highest performing model. With a RMSE score of `r min(rmseFinal)`.  
 
-# **Result**
+We haven't quite met the accuracy objective of < 0.86490. 
 
-Utilizing a Naive Bayes approach and with the following variables available we have achieved a RMSE accuracy score of XXXXX
+Delta = `r (min(rmseFinal)) - .86490`.  
 
+As the submission deadline is getting closer, I will implement this hypothesis on the validation data set and submit the project. Given more time; I would continue to add and evaluate new bias terms.  
+  
 ```{r}
 
-#Plot results
+lambda <- lambdaList[which.min(rmseFinal)]
+
+rmseTest <- function(l){
+
+muFinal <- mean(edx$rating)
+
+b_g <- edx %>% 
+  group_by(genres) %>% 
+  summarize(b_g = sum(rating - muFinal)/(n() + l))
+
+b_u <- edx %>% 
+  left_join(b_g, by = "genres") %>% 
+  group_by(userId) %>% 
+  summarize(b_u = sum(rating - muFinal - b_g)/(n()+ l))
+
+b_i <- edx %>% 
+  left_join(b_g, by = "genres") %>% 
+  left_join(b_u, by = "userId") %>% 
+  group_by(movieId) %>% 
+  summarize(b_i = sum(rating - muFinal - b_g - b_u)/(n() + l))
+
+pred <- validation %>% 
+  left_join(b_g, by = "genres") %>% 
+  left_join(b_u, by = "userId") %>% 
+  left_join(b_i, by = "movieId") %>% 
+  mutate(pred = muFinal + b_g + b_u + b_i) %>% 
+  pull(pred)
+
+return(RMSE(pred, validation$rating))
+
+}
+
+rmse <- rmseTest(lambda)
 
 ```
+  
+# **Result**
+
+Utilizing a Naive Bayes approach - the following model achieved a 'test' RMSE accuracy of: RMSE = `r rmse`.
 
 # **Conclusion**
 
-Limitations / Future work.. given enough computing power, i am eager to utilize a matri
+Given more time, I would have liked to add additional bias terms or dimensions to the hypothesis. Given more computational power, a matrix factorization algorithm would have been interesting to work on. 
